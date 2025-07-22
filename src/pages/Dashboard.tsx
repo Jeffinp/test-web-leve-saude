@@ -3,6 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
 import { collection, getDocs, Timestamp, query } from 'firebase/firestore'
+import StatsCard from '../components/StatsCard'
+import LoadingSkeleton from '../components/LoadingSkeleton'
+import Toast from '../components/Toast'
+import ExportButton from '../components/ExportButton'
+import { useToast } from '../hooks/useToast'
 
 /**
  * @interface Feedback
@@ -26,6 +31,7 @@ const Dashboard = () => {
 
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([])
   const [loading, setLoading] = useState(true)
+  const { toasts, showToast, removeToast } = useToast()
 
   // Estados para controle de filtro e busca
   const [searchTerm, setSearchTerm] = useState('')
@@ -54,8 +60,10 @@ const Dashboard = () => {
         }) as Feedback[]
 
         setFeedbacks(feedbacksData)
+        showToast('Feedbacks carregados com sucesso!', 'success')
       } catch (error) {
         console.error('Erro ao buscar feedbacks:', error)
+        showToast('Erro ao carregar feedbacks', 'error')
       } finally {
         setLoading(false)
       }
@@ -132,90 +140,135 @@ const Dashboard = () => {
    */
   const renderStars = (rating: number) => '⭐'.repeat(rating)
 
+  const stats = useMemo(() => {
+    const totalFeedbacks = feedbacks.length
+    const averageRating = totalFeedbacks > 0 
+      ? (feedbacks.reduce((sum, feedback) => sum + feedback.rating, 0) / totalFeedbacks).toFixed(1)
+      : '0.0'
+    const highRatings = feedbacks.filter(f => f.rating >= 4).length
+    const lowRatings = feedbacks.filter(f => f.rating <= 2).length
+
+    return { totalFeedbacks, averageRating, highRatings, lowRatings }
+  }, [feedbacks])
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-8">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-8 flex flex-col items-start justify-between sm:flex-row sm:items-center">
+        <div className="mb-8 flex flex-col items-start justify-between sm:flex-row sm:items-center bg-white p-6 rounded-lg shadow-lg">
           <div className="mb-4 sm:mb-0">
             <h1 className="text-3xl font-bold text-gray-900">
               Dashboard de Feedbacks
             </h1>
-            <p className="text-gray-600">Bem-vindo, {currentUser?.email}</p>
+            <p className="text-gray-600 text-lg">Bem-vindo, <span className="font-semibold text-indigo-600">{currentUser?.email}</span></p>
           </div>
-          <button
-            onClick={handleLogout}
-            className="rounded-md bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700"
-          >
-            Sair
-          </button>
+          <div className="flex gap-3">
+            <ExportButton 
+              feedbacks={filteredAndSortedFeedbacks} 
+              onExport={(message) => showToast(message, 'success')}
+            />
+            <button
+              onClick={handleLogout}
+              className="rounded-md bg-red-600 px-6 py-3 text-lg font-semibold text-white shadow-md hover:bg-red-700 transition duration-300 ease-in-out"
+            >
+              Sair
+            </button>
+          </div>
         </div>
 
-        <div className="rounded-lg bg-white p-6 shadow-md">
-          {/* Controles de filtro e busca para os feedbacks. */}
-          <div className="mb-6 flex flex-col gap-4 sm:flex-row">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <StatsCard
+            title="Total de Feedbacks"
+            value={stats.totalFeedbacks}
+            icon="📊"
+            color="text-blue-600"
+          />
+          <StatsCard
+            title="Avaliação Média"
+            value={`${stats.averageRating} ⭐`}
+            icon="📈"
+            color="text-green-600"
+          />
+          <StatsCard
+            title="Avaliações Altas (4-5)"
+            value={stats.highRatings}
+            icon="👍"
+            color="text-emerald-600"
+          />
+          <StatsCard
+            title="Avaliações Baixas (1-2)"
+            value={stats.lowRatings}
+            icon="👎"
+            color="text-red-600"
+          />
+        </div>
+
+        <div className="rounded-lg bg-white p-6 shadow-lg mb-8">
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row items-center">
             <input
               type="text"
               placeholder="Buscar por nome ou comentário..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-grow rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 focus:outline-none"
+              className="flex-grow rounded-lg border border-gray-300 px-4 py-2 shadow-sm placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition duration-150 ease-in-out"
             />
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm font-medium text-gray-700">
                 Ordenar por:
               </span>
               <button
                 onClick={() => setSortBy('createdAt_desc')}
-                className={`rounded-full px-3 py-1 text-sm ${sortBy === 'createdAt_desc' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                className={`rounded-full px-4 py-2 text-sm font-medium transition duration-200 ease-in-out ${sortBy === 'createdAt_desc' ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
               >
                 Mais Recentes
               </button>
               <button
                 onClick={() => setSortBy('rating_desc')}
-                className={`rounded-full px-3 py-1 text-sm ${sortBy === 'rating_desc' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                className={`rounded-full px-4 py-2 text-sm font-medium transition duration-200 ease-in-out ${sortBy === 'rating_desc' ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
               >
                 Melhor Nota
               </button>
               <button
                 onClick={() => setSortBy('rating_asc')}
-                className={`rounded-full px-3 py-1 text-sm ${sortBy === 'rating_asc' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                className={`rounded-full px-4 py-2 text-sm font-medium transition duration-200 ease-in-out ${sortBy === 'rating_asc' ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
               >
                 Pior Nota
               </button>
             </div>
           </div>
 
-          <h2 className="mb-4 text-xl font-semibold">Feedbacks Recebidos</h2>
+          <h2 className="mb-4 text-2xl font-bold text-gray-800">Feedbacks Recebidos</h2>
           {loading ? (
-            <p>Carregando feedbacks...</p>
+            <div className="space-y-6">
+              {[...Array(3)].map((_, i) => (
+                <LoadingSkeleton key={i} />
+              ))}
+            </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-6">
               {filteredAndSortedFeedbacks.length > 0 ? (
                 filteredAndSortedFeedbacks.map((feedback) => (
                   <div
                     key={feedback.id}
-                    className="rounded-md border bg-gray-50 p-4 transition-transform duration-300 hover:scale-[1.02]"
+                    className="bg-white p-6 rounded-lg shadow-md border border-gray-200 transition-all duration-300 hover:shadow-lg hover:border-indigo-300"
                   >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-lg font-bold text-gray-800">
-                          {feedback.userName}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {feedback.createdAt
-                            .toDate()
-                            .toLocaleDateString('pt-BR')}
-                        </p>
-                      </div>
-                      <p className="ml-4 flex-shrink-0 text-2xl">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xl font-semibold text-gray-900">
+                        {feedback.userName}
+                      </p>
+                      <p className="text-3xl flex-shrink-0">
                         {renderStars(feedback.rating)}
                       </p>
                     </div>
-                    <p className="mt-3 text-gray-700">{feedback.comment}</p>
+                    <p className="text-sm text-gray-500 mb-4">
+                      {feedback.createdAt
+                        .toDate()
+                        .toLocaleDateString('pt-BR')}
+                    </p>
+                    <p className="text-gray-700 leading-relaxed">{feedback.comment}</p>
                   </div>
                 ))
               ) : (
-                <p className="py-8 text-center text-gray-500">
+                <p className="py-12 text-center text-gray-500 text-lg">
                   Nenhum feedback encontrado.
                 </p>
               )}
@@ -223,6 +276,15 @@ const Dashboard = () => {
           )}
         </div>
       </div>
+      
+      {toasts.map((toast) => (
+        <Toast
+          key={toast.id}
+          message={toast.message}
+          type={toast.type}
+          onClose={() => removeToast(toast.id)}
+        />
+      ))}
     </div>
   )
 }
