@@ -3,19 +3,35 @@ import { signInWithEmailAndPassword } from 'firebase/auth'
 import { auth } from '../lib/firebase'
 import { useNavigate } from 'react-router-dom'
 
+/**
+ * @component Login
+ * @description Componente de página para o login de administradores.
+ *              Permite a autenticação via e-mail e senha usando Firebase Authentication.
+ */
 const Login = () => {
+  // Estados para armazenar o e-mail e a senha digitados pelo usuário.
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  // Estado para armazenar mensagens de erro durante o processo de login.
   const [error, setError] = useState<string | null>(null)
+  // Hook para navegação programática após o login bem-sucedido.
   const navigate = useNavigate()
 
+  /**
+   * @function handleLogin
+   * @param {React.FormEvent} e - Evento de submissão do formulário.
+   * @description Lida com a submissão do formulário de login.
+   *              Tenta autenticar o usuário com e-mail e senha no Firebase.
+   *              Em caso de sucesso, redireciona para a página inicial (`/`).
+   *              Em caso de falha, exibe uma mensagem de erro.
+   */
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
+    setError(null) // Limpa qualquer erro anterior.
 
     try {
       await signInWithEmailAndPassword(auth, email, password)
-      navigate('/')
+      navigate('/') // Redireciona para a dashboard após login bem-sucedido.
     } catch (err) {
       setError('Falha no login. Verifique seu e-mail e senha.')
       console.error('Erro de login:', err)
