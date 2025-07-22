@@ -4,6 +4,10 @@ import { useAuth } from '../context/AuthContext'
 import { db } from '../lib/firebase'
 import { collection, getDocs, Timestamp, query } from 'firebase/firestore'
 
+/**
+ * @interface Feedback
+ * @description Define a estrutura de um objeto de feedback.
+ */
 interface Feedback {
   id: string
   comment: string
@@ -12,26 +16,30 @@ interface Feedback {
   createdAt: Timestamp
 }
 
+/**
+ * @component Dashboard
+ * @description Componente principal para visualização e gerenciamento de feedbacks.
+ */
 const Dashboard = () => {
-  const { currentUser, logout } = useAuth()
+  const { currentUser, logout } = useAuth() // Acesso ao usuário autenticado e função de logout.
   const navigate = useNavigate()
+
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([])
   const [loading, setLoading] = useState(true)
 
-  // --- NOVOS ESTADOS PARA FILTRO E BUSCA ---
+  // Estados para controle de filtro e busca
   const [searchTerm, setSearchTerm] = useState('')
-  const [sortBy, setSortBy] = useState('createdAt_desc') // Opção padrão
+  const [sortBy, setSortBy] = useState('createdAt_desc') // Padrão: feedbacks mais recentes
 
   useEffect(() => {
     const fetchFeedbacks = async () => {
       try {
-        // A query inicial pode ser mais simples agora, pois a ordenação será no cliente
         const q = query(collection(db, 'feedbacks'))
         const querySnapshot = await getDocs(q)
         const feedbacksData = querySnapshot.docs.map((doc) => {
           const data = doc.data()
 
-          // Garantir que temos um Timestamp válido
+          // Garante que `createdAt` é um Timestamp válido, caso contrário, usa o timestamp atual.
           if (!data.createdAt) {
             data.createdAt = Timestamp.now()
           }
@@ -55,11 +63,15 @@ const Dashboard = () => {
     fetchFeedbacks()
   }, [])
 
-  // --- NOVA LÓGICA MEMORIZADA PARA FILTRAR E ORDENAR ---
+  /**
+   * @function filteredAndSortedFeedbacks
+   * @description Memoriza a lista de feedbacks filtrada e ordenada com base nos estados `searchTerm` e `sortBy`.
+   *              Evita recálculos desnecessários em cada renderização.
+   */
   const filteredAndSortedFeedbacks = useMemo(() => {
     let result = [...feedbacks]
 
-    // 1. Aplicar filtro de busca
+    // Aplica filtro de busca por nome de usuário ou comentário.
     if (searchTerm) {
       result = result.filter(
         (feedback) =>
@@ -72,7 +84,7 @@ const Dashboard = () => {
       )
     }
 
-    // 2. Aplicar ordenação
+    // Aplica ordenação com base na opção selecionada.
     switch (sortBy) {
       case 'createdAt_asc':
         result.sort((a, b) => {
@@ -100,6 +112,10 @@ const Dashboard = () => {
     return result
   }, [feedbacks, searchTerm, sortBy])
 
+  /**
+   * @function handleLogout
+   * @description Realiza o logout do usuário e redireciona para a página de login.
+   */
   const handleLogout = async () => {
     try {
       await logout()
@@ -109,6 +125,11 @@ const Dashboard = () => {
     }
   }
 
+  /**
+   * @function renderStars
+   * @param {number} rating - A nota (número de estrelas) a ser renderizada.
+   * @returns {string} Uma string com o número de estrelas correspondente à nota.
+   */
   const renderStars = (rating: number) => '⭐'.repeat(rating)
 
   return (
@@ -130,7 +151,7 @@ const Dashboard = () => {
         </div>
 
         <div className="rounded-lg bg-white p-6 shadow-md">
-          {/* --- NOVOS CONTROLES DE FILTRO E BUSCA --- */}
+          {/* Controles de filtro e busca para os feedbacks. */}
           <div className="mb-6 flex flex-col gap-4 sm:flex-row">
             <input
               type="text"
@@ -169,7 +190,6 @@ const Dashboard = () => {
             <p>Carregando feedbacks...</p>
           ) : (
             <div className="space-y-4">
-              {/* --- ATUALIZAR MAP PARA USAR A NOVA LISTA --- */}
               {filteredAndSortedFeedbacks.length > 0 ? (
                 filteredAndSortedFeedbacks.map((feedback) => (
                   <div
